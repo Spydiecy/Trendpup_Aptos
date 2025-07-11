@@ -1,6 +1,7 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
 const net = require('net');
+const { execSync } = require('child_process');
 
 // Tor control port config
 const TOR_CONTROL_PORT = 9051;
@@ -68,22 +69,139 @@ let lastUserAgentIndex = -1;
 let totalAttempts = 0;
 let lastSuccessfulScrape = Date.now();
 
+async function scrapePage(pageNum: number, userAgent: string): Promise<any[]> {
+  let browser, context, page;
+  try {
+    browser = await chromium.launch({
+      headless: true,
+      proxy: { server: 'socks5://127.0.0.1:9050', username: '', password: '' },
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--window-size=1280,720',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+        '--single-process',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-breakpad',
+        '--disable-component-extensions-with-background-pages',
+        '--disable-features=site-per-process,TranslateUI',
+        '--disable-ipc-flooding-protection',
+        '--disable-renderer-backgrounding',
+        '--disable-dev-shm-usage',
+        '--proxy-server=socks5://127.0.0.1:9050'
+      ]
+    });
+    context = await browser.newContext({
+      viewport: { width: 1280, height: 720 },
+      userAgent,
+      ignoreHTTPSErrors: true,
+      deviceScaleFactor: 1
+    });
+    page = await context.newPage();
+    const url = `https://dexscreener.com/aptos/page-${pageNum}?order=asc&rankBy=pairAge`;
+    console.log(`Navigating to DexScreener page ${pageNum}...`);
+    try {
+      await page.goto(url, {
+        timeout: 30000,
+        waitUntil: 'networkidle'
+      });
+    } catch (err) {
+      console.log('Network idle failed, trying with domcontentloaded...');
+      await page.goto(url, {
+        timeout: 45000,
+        waitUntil: 'domcontentloaded'
+      });
+    }
+    // Wait for Cloudflare or page to settle
+    console.log('Waiting for page to settle...');
+    await page.waitForTimeout(8000);
+    // Check if we're blocked by checking for specific elements
+    const isBlocked = await page.locator('text=Access denied').count() > 0 ||
+      await page.locator('text=Cloudflare').count() > 0 ||
+      await page.locator('text=Just a moment').count() > 0;
+    if (isBlocked) {
+      throw new Error('Access denied or Cloudflare challenge detected');
+    }
+    // Wait for the table to load
+    console.log('Waiting for token table to load...');
+    await page.waitForSelector('.ds-dex-table-row-base-token-name', { timeout: 15000 });
+    console.log('Scraping token data...');
+    // Token names
+    const names = await page.locator('.ds-dex-table-row-base-token-name').allTextContents();
+    // Token Symbol
+    const symbol = await page.locator('.ds-dex-table-row-base-token-symbol').allTextContents();
+    const symbol1 = await page.locator('.ds-dex-table-row-quote-token-symbol').allTextContents();
+    // Token price (handle sub-elements by joining innerText)
+    const priceHandles = await page.locator('.ds-dex-table-row-col-price').elementHandles();
+    const prices: string[] = [];
+    for (const handle of priceHandles) {
+      const text = await handle.evaluate((el: Element) => el.textContent || '');
+      prices.push(text.replace(/\s+/g, '').trim());
+    }
+    // Token volume
+    const volume = await page.locator('.ds-dex-table-row-col-volume').allTextContents();
+    // Token mcap
+    const mcap = await page.locator('.ds-dex-table-row-col-market-cap').allTextContents();
+    // Token Liquidity
+    const liquidity = await page.locator('.ds-dex-table-row-col-liquidity').allTextContents();
+    // Token transactions
+    const txns = await page.locator('.ds-dex-table-row-col-txns').allTextContents();
+    // Token age
+    const age = await page.locator('.ds-dex-table-row-col-pair-age').allTextContents();
+    // Token change (5m)
+    const fivem = await page.locator('.ds-dex-table-row-col-price-change-m5').allTextContents();
+    // Token change (1h)
+    const oneh = await page.locator('.ds-dex-table-row-col-price-change-h1').allTextContents();
+    // Token change (6h)
+    const sixh = await page.locator('.ds-dex-table-row-col-price-change-h6').allTextContents();
+    // Token change (24h)
+    const oned = await page.locator('.ds-dex-table-row-col-price-change-h24').allTextContents();
+    // Scrape href links for each token row (target <a> elements)
+    const hrefs = await page.$$eval('a.ds-dex-table-row.ds-dex-table-row-new', (rows: Element[]) => rows.map((row: Element) => (row as HTMLAnchorElement).getAttribute('href')));
+    const tokens = names.map((name: string, i: number) => ({
+      name: name,
+      symbol: symbol[i],
+      symbol1: symbol1[i],
+      price: prices[i],
+      volume: volume[i],
+      liquidity: liquidity[i],
+      mcap: mcap[i],
+      transactions: txns[i],
+      age: age[i],
+      'change-5m': fivem[i],
+      'change-1h': oneh[i],
+      'change-6h': sixh[i],
+      'change-24h': oned[i],
+      href: hrefs[i] ? `https://dexscreener.com${hrefs[i]}` : null
+    }));
+    return tokens;
+  } catch (err) {
+    console.error(`❌ Error scraping page ${pageNum}:`, err);
+    return [];
+  } finally {
+    try { if (page) await page.close(); } catch (err) { console.error('❌ Error closing page:', err); }
+    try { if (context) await context.close(); } catch (err) { console.error('❌ Error closing context:', err); }
+    try { if (browser) await browser.close(); } catch (err) { console.error('❌ Error closing browser:', err); }
+    // Safeguard: kill any leftover Chromium processes
+    try { execSync('pkill -9 chromium || true'); } catch (err) { /* ignore */ }
+    try { execSync('pkill -9 chrome || true'); } catch (err) { /* ignore */ }
+  }
+}
+
 async function scraper() {
   if (isBrowserActive) {
     console.log('⏭️ Chromium session already active, skipping this run.');
     return false;
   }
   isBrowserActive = true;
-  let browser;
-  let context;
-  let page;
   totalAttempts++;
   const attemptStartTime = Date.now();
-
   console.log(`\n=== Scraper Attempt #${totalAttempts} ===`);
   console.log(`Consecutive failures: ${consecutiveFailures}`);
   console.log(`Time since last success: ${Math.round((Date.now() - lastSuccessfulScrape) / 1000)}s`);
-  
   try {
     // Check if we've been failing for too long
     if (Date.now() - lastSuccessfulScrape > 30 * 60 * 1000) { // 30 minutes
@@ -101,144 +219,11 @@ async function scraper() {
     } while (uaIndex === lastUserAgentIndex && userAgentStrings.length > 1);
     lastUserAgentIndex = uaIndex;
     const userAgent = userAgentStrings[uaIndex];
-
     console.log(`Using user agent: ${userAgent.substring(0, 50)}...`);
-    
-    // Launch browser with lower resource usage
-    console.log('🚀 Launching Chromium browser...');
-    try {
-      browser = await chromium.launch({
-        headless: true,
-        proxy: { server: 'socks5://127.0.0.1:9050', username: '', password: '' },
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--window-size=1280,720',
-          '--disable-accelerated-2d-canvas',
-          '--disable-gpu',
-          '--single-process',
-          '--disable-background-timer-throttling',
-          '--disable-backgrounding-occluded-windows',
-          '--disable-breakpad',
-          '--disable-component-extensions-with-background-pages',
-          '--disable-features=site-per-process,TranslateUI',
-          '--disable-ipc-flooding-protection',
-          '--disable-renderer-backgrounding',
-          '--disable-dev-shm-usage',
-          '--proxy-server=socks5://127.0.0.1:9050'
-        ]
-      });
-      console.log('✅ Browser launched successfully');
-    } catch (browserErr) {
-      console.error('❌ Failed to launch browser:', browserErr);
-      throw new Error(`Browser launch failed: ${browserErr}`);
-    }
-    
-    // Create context with lower resource usage
-    console.log('🔧 Creating browser context...');
-    try {
-      context = await browser.newContext({
-        viewport: { width: 1280, height: 720 },
-        userAgent,
-        ignoreHTTPSErrors: true,
-        deviceScaleFactor: 1
-      });
-      console.log('✅ Browser context created successfully');
-    } catch (contextErr) {
-      console.error('❌ Failed to create browser context:', contextErr);
-      throw new Error(`Context creation failed: ${contextErr}`);
-    }
-    
-    // Create page with proper error handling
-    console.log('📄 Creating new page...');
-    try {
-      page = await context.newPage();
-      console.log('✅ Page created successfully');
-    } catch (pageErr) {
-      console.error('❌ Failed to create page:', pageErr);
-      throw new Error(`Page creation failed: ${pageErr}`);
-    }
-    
-    // Scrape 7 pages and aggregate results
+    // Queue: scrape each page sequentially
     let allTokens: any[] = [];
     for (let pageNum = 1; pageNum <= 7; pageNum++) {
-      const url = `https://dexscreener.com/aptos/page-${pageNum}?order=asc&rankBy=pairAge`;
-      console.log(`Navigating to DexScreener page ${pageNum}...`);
-      try {
-        await page.goto(url, {
-          timeout: 30000,
-          waitUntil: 'networkidle'
-        });
-      } catch (err) {
-        console.log('Network idle failed, trying with domcontentloaded...');
-        await page.goto(url, {
-          timeout: 45000,
-          waitUntil: 'domcontentloaded'
-        });
-      }
-      // Wait for Cloudflare or page to settle
-      console.log('Waiting for page to settle...');
-      await page.waitForTimeout(8000);
-      // Check if we're blocked by checking for specific elements
-      const isBlocked = await page.locator('text=Access denied').count() > 0 ||
-        await page.locator('text=Cloudflare').count() > 0 ||
-        await page.locator('text=Just a moment').count() > 0;
-      if (isBlocked) {
-        throw new Error('Access denied or Cloudflare challenge detected');
-      }
-      // Wait for the table to load
-      console.log('Waiting for token table to load...');
-      await page.waitForSelector('.ds-dex-table-row-base-token-name', { timeout: 15000 });
-      console.log('Scraping token data...');
-      // Token names
-      const names = await page.locator('.ds-dex-table-row-base-token-name').allTextContents();
-      // Token Symbol
-      const symbol = await page.locator('.ds-dex-table-row-base-token-symbol').allTextContents();
-      const symbol1 = await page.locator('.ds-dex-table-row-quote-token-symbol').allTextContents();
-      // Token price (handle sub-elements by joining innerText)
-      const priceHandles = await page.locator('.ds-dex-table-row-col-price').elementHandles();
-      const prices: string[] = [];
-      for (const handle of priceHandles) {
-        const text = await handle.evaluate((el: Element) => el.textContent || '');
-        prices.push(text.replace(/\s+/g, '').trim());
-      }
-      // Token volume
-      const volume = await page.locator('.ds-dex-table-row-col-volume').allTextContents();
-      // Token mcap
-      const mcap = await page.locator('.ds-dex-table-row-col-market-cap').allTextContents();
-      // Token Liquidity
-      const liquidity = await page.locator('.ds-dex-table-row-col-liquidity').allTextContents();
-      // Token transactions
-      const txns = await page.locator('.ds-dex-table-row-col-txns').allTextContents();
-      // Token age
-      const age = await page.locator('.ds-dex-table-row-col-pair-age').allTextContents();
-      // Token change (5m)
-      const fivem = await page.locator('.ds-dex-table-row-col-price-change-m5').allTextContents();
-      // Token change (1h)
-      const oneh = await page.locator('.ds-dex-table-row-col-price-change-h1').allTextContents();
-      // Token change (6h)
-      const sixh = await page.locator('.ds-dex-table-row-col-price-change-h6').allTextContents();
-      // Token change (24h)
-      const oned = await page.locator('.ds-dex-table-row-col-price-change-h24').allTextContents();
-      // Scrape href links for each token row (target <a> elements)
-      const hrefs = await page.$$eval('a.ds-dex-table-row.ds-dex-table-row-new', (rows: Element[]) => rows.map((row: Element) => (row as HTMLAnchorElement).getAttribute('href')));
-      const tokens = names.map((name: string, i: number) => ({
-        name: name,
-        symbol: symbol[i],
-        symbol1: symbol1[i],
-        price: prices[i],
-        volume: volume[i],
-        liquidity: liquidity[i],
-        mcap: mcap[i],
-        transactions: txns[i],
-        age: age[i],
-        'change-5m': fivem[i],
-        'change-1h': oneh[i],
-        'change-6h': sixh[i],
-        'change-24h': oned[i],
-        href: hrefs[i] ? `https://dexscreener.com${hrefs[i]}` : null
-      }));
+      const tokens = await scrapePage(pageNum, userAgent);
       allTokens = allTokens.concat(tokens);
     }
     const jsonData = {
@@ -251,7 +236,7 @@ async function scraper() {
     lastSuccessfulScrape = Date.now();
     const scrapeDuration = Date.now() - attemptStartTime;
     console.log(`✅ Scrape successful! Found ${allTokens.length} tokens in ${scrapeDuration}ms`);
-    return true; // Return true to indicate success
+    return true; // Return to indicate success
     
   } catch (err) {
     consecutiveFailures++;
@@ -276,32 +261,6 @@ async function scraper() {
     
     return false; // Return false to indicate failure
   } finally {
-    // Ensure proper cleanup with error handling
-    console.log('🧹 Cleaning up resources...');
-    try {
-      if (page) {
-        await page.close();
-        console.log('✅ Page closed');
-      }
-    } catch (err) {
-      console.error('❌ Error closing page:', err);
-    }
-    try {
-      if (context) {
-        await context.close();
-        console.log('✅ Context closed');
-      }
-    } catch (err) {
-      console.error('❌ Error closing context:', err);
-    }
-    try {
-      if (browser) {
-        await browser.close();
-        console.log('✅ Browser closed');
-      }
-    } catch (err) {
-      console.error('❌ Error closing browser:', err);
-    }
     isBrowserActive = false; // Allow next Chromium session
   }
 }
