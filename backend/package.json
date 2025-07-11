@@ -1,0 +1,29 @@
+{
+  "name": "dexscreener-scraper",
+  "version": "1.0.0",
+  "description": "Scrape token names from DexScreener Avalanche page",
+  "main": "dist/token_scraper.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "concurrently \"node dist/token_scraper.js\" \"node dist/twitter_scraper.js\" \"node dist/ai_analyzer.js\" \"node dist/api-server.js\"",
+    "dev": "tsc && node dist/test.js"
+  },
+  "dependencies": {
+    "@google-cloud/storage": "^7.16.0",
+    "@google-cloud/vertexai": "^1.10.0",
+    "@google/generative-ai": "^0.24.1",
+    "axios": "^1.10.0",
+    "concurrently": "^9.2.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.0.0",
+    "express": "^5.1.0",
+    "google-auth-library": "^10.1.0",
+    "playwright": "^1.40.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^20.19.2",
+    "typescript": "^5.0.0"
+  }
+}

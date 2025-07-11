@@ -191,6 +191,40 @@ async function scrapePage(pageNum: number, userAgent: string): Promise<any[]> {
   }
 }
 
+async function scrapePageWithRetry(pageNum: number, userAgent: string, maxRetries: number = 3): Promise<any[]> {
+  let attempt = 0;
+  
+  while (attempt < maxRetries) {
+    attempt++;
+    console.log(`Scraping page ${pageNum} (attempt ${attempt}/${maxRetries})...`);
+    
+    const tokens = await scrapePage(pageNum, userAgent);
+    
+    if (tokens.length > 0) {
+      console.log(`✅ Page ${pageNum} scraped successfully: ${tokens.length} tokens`);
+      return tokens;
+    }
+    
+    console.log(`❌ Page ${pageNum} failed (attempt ${attempt}/${maxRetries}), retrying...`);
+    
+    // Wait before retry (exponential backoff)
+    const waitTime = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+    console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+    await new Promise(res => setTimeout(res, waitTime));
+    
+    // Rotate IP after failed attempt
+    try {
+      await sendTorNewnym();
+      console.log('✅ Tor IP rotated for retry');
+    } catch (torErr) {
+      console.error('❌ Failed to rotate Tor IP:', torErr);
+    }
+  }
+  
+  console.error(`❌ Page ${pageNum} failed after ${maxRetries} attempts`);
+  return [];
+}
+
 async function scraper() {
   if (isBrowserActive) {
     console.log('⏭️ Chromium session already active, skipping this run.');
@@ -220,11 +254,17 @@ async function scraper() {
     lastUserAgentIndex = uaIndex;
     const userAgent = userAgentStrings[uaIndex];
     console.log(`Using user agent: ${userAgent.substring(0, 50)}...`);
-    // Queue: scrape each page sequentially
+    // Queue: scrape each page sequentially with retry logic
     let allTokens: any[] = [];
     for (let pageNum = 1; pageNum <= 7; pageNum++) {
-      const tokens = await scrapePage(pageNum, userAgent);
+      const tokens = await scrapePageWithRetry(pageNum, userAgent);
       allTokens = allTokens.concat(tokens);
+      
+      // Add delay between pages to avoid rate limiting
+      if (pageNum < 7) {
+        console.log(`⏳ Waiting 2 seconds before next page...`);
+        await new Promise(res => setTimeout(res, 2000));
+      }
     }
     const jsonData = {
       timestamp: new Date().toISOString(),

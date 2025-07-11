@@ -1,0 +1,245 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import * as dotenv from 'dotenv';
+import { VertexAI } from '@google-cloud/vertexai';
+
+dotenv.config({ path: path.resolve(__dirname, '/home/trendpup/trendpup-aptos/.env') });
+
+const TWEETS_FILE = 'tweets.json';
+export const OUTPUT_FILE = 'ai_analyzer.json';
+export const APTOS_TOKENS = 'aptos_tokens.json';
+
+// Vertex AI configuration
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT || '';
+const LOCATION = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
+
+// Initialize Vertex AI
+const vertexAI = new VertexAI({
+  project: PROJECT_ID,
+  location: LOCATION,
+});
+
+// Helper to get token info from aptos_tokens.json
+function getTokenInfo(symbol: string, aptosTokens: any): any {
+  if (!aptosTokens?.tokens) return null;
+  return aptosTokens.tokens.find((t: any) => t.symbol === symbol) || null;
+}
+
+async function analyzeTokenVertexAI(symbol: string, tweets: any[], tokenInfo: any): Promise<TokenAnalysis | null> {
+  let tokenInfoStr = '';
+  if (tokenInfo) {
+    tokenInfoStr = `Token info: ${JSON.stringify(tokenInfo)}\n`;
+  }
+  // Use up to 20 tweets, and instruct the AI to use market data and name if tweets are insufficient
+  const tweetsText = tweets.map(t => t.text).slice(0, 20).join(' | ');
+  const prompt = `Determine if the following token is a memecoin. Use the recent tweets below if available. If there is not enough tweet data, use the token's market data and name to make your determination. If it is a memecoin, analyze it for risk (1-10, 10=highest risk), investment potential (1-10, 10=best potential), and an overall score (1-100, 100=best overall). Token symbol: ${symbol}\n${tokenInfoStr}Recent tweets: ${tweetsText}\nRespond ONLY with a single JSON object, no extra text, no code blocks, no explanations. The JSON object MUST have these exact keys: symbol, is_memecoin (boolean), risk, potential, overall, rationale. Example: { "symbol": "${symbol}", "is_memecoin": true, "risk": 5, "potential": 7, "overall": 65, "rationale": "..." }`;
+  
+  try {
+    const generativeModel = vertexAI.preview.getGenerativeModel({
+      model: 'gemini-2.0-flash-exp',
+      generationConfig: {
+        maxOutputTokens: 1000,
+        temperature: 0.7,
+        topP: 0.95,
+      },
+    });
+
+    const result = await generativeModel.generateContent(prompt);
+    const responseText = result.response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    let text = responseText.replace(/```json|```/g, '').trim();
+    text = text.replace(/([\x00-\x08\x0B\x0C\x0E-\x1F])/g, ' ');
+    const match = text.match(/\{[\s\S]*?\}/);
+    let parsed;
+    try {
+      parsed = match ? JSON.parse(match[0]) : JSON.parse(text);
+    } catch (e) {
+      console.error(`Error parsing extracted JSON for ${symbol}:`, e, '\nExtracted:', match ? match[0] : text);
+      return null;
+    }
+    if (!parsed.is_memecoin) {
+      console.log(`Token ${symbol} is not a memecoin. Skipping.`);
+      return null;
+    }
+    
+    // Helper function to parse price strings
+    const parsePrice = (priceStr: string): number => {
+      const cleaned = priceStr.replace(/,/g, '').replace(/[^\d.-]/g, '');
+      const price = parseFloat(cleaned);
+      return isNaN(price) ? 0 : price;
+    };
+    
+    // Helper function to parse percentage change
+    const parseChange = (changeStr: string): number => {
+      if (changeStr === 'N/A') return 0;
+      const cleaned = changeStr.replace(/[^\d.-]/g, '');
+      const change = parseFloat(cleaned);
+      return isNaN(change) ? 0 : change;
+    };
+    
+    return {
+      symbol: parsed.symbol || symbol,
+      risk: parsed.risk,
+      investmentPotential: parsed.potential,
+      overall: parsed.overall,
+      rationale: parsed.rationale || '',
+      // Include market data from tokenInfo if available
+      price: tokenInfo?.price ? parsePrice(tokenInfo.price) : 0,
+      volume: tokenInfo?.volume || 'N/A',
+      marketCap: tokenInfo?.mcap || 'N/A',
+      liquidity: tokenInfo?.liquidity || 'N/A',
+      change24h: tokenInfo?.['change-24h'] ? parseChange(tokenInfo['change-24h']) : 0,
+      age: tokenInfo?.age || 'N/A',
+      href: tokenInfo?.href || '#'
+    };
+  } catch (e: any) {
+    console.error(`Vertex AI error for ${symbol}:`, e);
+    // Vertex AI has much higher rate limits, but still handle errors gracefully
+    if (e.code === 429 || e.status === 429) {
+      console.error(`Rate limit exceeded for ${symbol}. This is rare with Vertex AI - check your quota.`);
+      throw new Error('RATE_LIMIT_EXCEEDED');
+    }
+    return null;
+  }
+}
+
+interface TokenAnalysis {
+  symbol: string;
+  risk: number;
+  investmentPotential: number;
+  overall: number;
+  rationale: string;
+  // Market data fields
+  price?: number;
+  volume?: string;
+  marketCap?: string;
+  liquidity?: string;
+  change24h?: number;
+  age?: string;
+  href?: string;
+}
+
+// Helper to write analysis results with best token on top
+function writeResultsWithBestToken(results: TokenAnalysis[], outputFile: string) {
+  if (!results.length) return;
+  // Find the best token by highest overall score
+  const best = results.reduce((a, b) => (b.overall > a.overall ? b : a));
+  // Prepare output object
+  const output = {
+    best_token: {
+      symbol: best.symbol,
+      overall: best.overall,
+      rationale: best.rationale
+    },
+    results
+  };
+  fs.writeFileSync(outputFile, JSON.stringify(output, null, 2));
+}
+
+async function main() {
+  let tweetsObj: any = {};
+  let aptosTokens: any = {};
+  try {
+    if (!fs.existsSync(TWEETS_FILE)) {
+      console.log('tweets.json not found. Nothing to analyze.');
+      return;
+    }
+    tweetsObj = JSON.parse(fs.readFileSync(TWEETS_FILE, 'utf8'));
+  } catch (e) {
+    console.error('Error reading or parsing tweets.json:', e);
+    return;
+  }
+  try {
+    if (fs.existsSync(APTOS_TOKENS)) {
+      aptosTokens = JSON.parse(fs.readFileSync(APTOS_TOKENS, 'utf8'));
+    }
+  } catch (e) {
+    console.error('Error reading or parsing aptos_tokens.json:', e);
+    aptosTokens = {};
+  }
+
+  let analysisResults: TokenAnalysis[] = [];
+  try {
+    if (fs.existsSync(OUTPUT_FILE)) {
+      // Read only the results array if best_token is present
+      const fileContent = JSON.parse(fs.readFileSync(OUTPUT_FILE, 'utf8'));
+      if (Array.isArray(fileContent)) {
+        analysisResults = fileContent;
+      } else if (Array.isArray(fileContent.results)) {
+        analysisResults = fileContent.results;
+      }
+    }
+  } catch (e) {
+    console.error('Error reading or parsing ai_analyzer.json:', e);
+    analysisResults = [];
+  }
+
+  // Create a queue of tokens to analyze
+  const tokenQueue = Object.keys(tweetsObj);
+  const analyzedSymbols = new Set(analysisResults.map(a => a.symbol));
+  
+  // Filter out already analyzed tokens for initial run
+  const tokensToAnalyze = tokenQueue.filter(symbol => !analyzedSymbols.has(symbol));
+  
+  console.log(`Found ${tokensToAnalyze.length} new tokens to analyze`);
+  console.log(`Total tokens in queue: ${tokenQueue.length}`);
+  
+  // Process tokens in queue with 5-minute intervals
+  async function processTokenQueue() {
+    let currentIndex = 0;
+    
+    while (true) {
+      // Get current token from queue (cycle through all tokens)
+      const currentSymbol = tokenQueue[currentIndex % tokenQueue.length];
+      
+      try {
+        console.log(`Processing token ${currentIndex + 1}/${tokenQueue.length}: ${currentSymbol}`);
+        
+        const tweets = tweetsObj[currentSymbol]?.tweets || [];
+        const tokenInfo = getTokenInfo(currentSymbol, aptosTokens);
+        
+        const analysis = await analyzeTokenVertexAI(currentSymbol, tweets, tokenInfo);
+        
+        if (analysis && analysis.rationale && analysis.rationale.trim() !== '' && analysis.risk !== -1) {
+          // Check if token already exists in results
+          const existingIndex = analysisResults.findIndex(a => a.symbol === currentSymbol);
+          
+          if (existingIndex >= 0) {
+            // Update existing analysis
+            analysisResults[existingIndex] = analysis;
+            console.log(`Updated analysis for ${currentSymbol}`);
+          } else {
+            // Add new analysis
+            analysisResults.push(analysis);
+            console.log(`Added new analysis for ${currentSymbol}`);
+          }
+          
+          // Write results after each successful analysis
+          writeResultsWithBestToken(analysisResults, OUTPUT_FILE);
+        } else if (!analysis) {
+          console.warn(`Skipping ${currentSymbol}: Not a memecoin or no valid analysis returned.`);
+        }
+        
+      } catch (e: any) {
+        if (e.message === 'RATE_LIMIT_EXCEEDED') {
+          console.log('Daily rate limit exceeded. Stopping analysis until quota resets.');
+          console.log('The analyzer will resume automatically when you restart it after quota reset.');
+          break; // Exit the loop
+        }
+        console.error(`Error analyzing token ${currentSymbol}:`, e);
+      }
+      
+      // Move to next token
+      currentIndex++;
+      
+      // Wait 30 seconds between requests (Vertex AI has much higher limits)
+      console.log(`Waiting 30 seconds before next analysis...`);
+      await new Promise(res => setTimeout(res, 30 * 1000)); // 30 seconds
+    }
+  }
+  
+  // Start processing queue
+  await processTokenQueue();
+}
+
+main().catch(console.error);
