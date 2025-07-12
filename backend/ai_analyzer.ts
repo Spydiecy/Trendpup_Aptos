@@ -19,6 +19,25 @@ const vertexAI = new VertexAI({
   location: LOCATION,
 });
 
+// Track last modification time of aptos_tokens.json
+let lastAptosTokensModified = 0;
+
+// Function to check if aptos_tokens.json was updated
+function checkAptosTokensUpdated(): boolean {
+  try {
+    if (!fs.existsSync(APTOS_TOKENS)) return false;
+    const stats = fs.statSync(APTOS_TOKENS);
+    const currentModified = stats.mtimeMs;
+    if (currentModified > lastAptosTokensModified) {
+      lastAptosTokensModified = currentModified;
+      return true;
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
 // Helper to get token info from aptos_tokens.json
 function getTokenInfo(symbol: string, aptosTokens: any): any {
   if (!aptosTokens?.tokens) return null;
@@ -136,6 +155,48 @@ function writeResultsWithBestToken(results: TokenAnalysis[], outputFile: string)
   fs.writeFileSync(outputFile, JSON.stringify(output, null, 2));
 }
 
+// Helper function to update market data for existing analyses
+function updateMarketData(analysisResults: TokenAnalysis[], aptosTokens: any): TokenAnalysis[] {
+  console.log('Updating market data for existing analyses...');
+  
+  const parsePrice = (priceStr: string): number => {
+    const cleaned = priceStr.replace(/,/g, '').replace(/[^\d.-]/g, '');
+    const price = parseFloat(cleaned);
+    return isNaN(price) ? 0 : price;
+  };
+  
+  const parseChange = (changeStr: string): number => {
+    if (changeStr === 'N/A') return 0;
+    const cleaned = changeStr.replace(/[^\d.-]/g, '');
+    const change = parseFloat(cleaned);
+    return isNaN(change) ? 0 : change;
+  };
+
+  let updatedCount = 0;
+  const updatedResults = analysisResults.map(analysis => {
+    const tokenInfo = getTokenInfo(analysis.symbol, aptosTokens);
+    if (tokenInfo) {
+      console.log(`Updated market data for ${analysis.symbol}`);
+      updatedCount++;
+      return {
+        ...analysis,
+        price: tokenInfo.price ? parsePrice(tokenInfo.price) : analysis.price || 0,
+        volume: tokenInfo.volume || analysis.volume || 'N/A',
+        marketCap: tokenInfo.mcap || analysis.marketCap || 'N/A',
+        liquidity: tokenInfo.liquidity || analysis.liquidity || 'N/A',
+        change24h: tokenInfo['change-24h'] ? parseChange(tokenInfo['change-24h']) : analysis.change24h || 0,
+        age: tokenInfo.age || analysis.age || 'N/A',
+        href: tokenInfo.href || analysis.href || '#'
+      };
+    }
+    // Return original analysis if token is not found in aptos_tokens.json
+    return analysis;
+  });
+
+  console.log(`Updated market data for ${updatedCount} out of ${analysisResults.length} tokens`);
+  return updatedResults;
+}
+
 async function main() {
   let tweetsObj: any = {};
   let aptosTokens: any = {};
@@ -174,6 +235,23 @@ async function main() {
     analysisResults = [];
   }
 
+  // Initialize last modified time for aptos_tokens.json
+  try {
+    if (fs.existsSync(APTOS_TOKENS)) {
+      const stats = fs.statSync(APTOS_TOKENS);
+      lastAptosTokensModified = stats.mtimeMs;
+    }
+  } catch (e) {
+    console.error('Error getting aptos_tokens.json stats:', e);
+  }
+
+  // Update market data for existing analyses
+  if (analysisResults.length > 0) {
+    analysisResults = updateMarketData(analysisResults, aptosTokens);
+    writeResultsWithBestToken(analysisResults, OUTPUT_FILE);
+    console.log(`Updated market data for ${analysisResults.length} existing analyses`);
+  }
+
   // Create a queue of tokens to analyze
   const tokenQueue = Object.keys(tweetsObj);
   const analyzedSymbols = new Set(analysisResults.map(a => a.symbol));
@@ -189,6 +267,19 @@ async function main() {
     let currentIndex = 0;
     
     while (true) {
+      // Check if aptos_tokens.json was updated
+      if (checkAptosTokensUpdated()) {
+        console.log('Detected aptos_tokens.json update. Refreshing market data...');
+        try {
+          const updatedAptosTokens = JSON.parse(fs.readFileSync(APTOS_TOKENS, 'utf8'));
+          analysisResults = updateMarketData(analysisResults, updatedAptosTokens);
+          writeResultsWithBestToken(analysisResults, OUTPUT_FILE);
+          console.log('Market data updated successfully');
+        } catch (e) {
+          console.error('Error updating market data:', e);
+        }
+      }
+      
       // Get current token from queue (cycle through all tokens)
       const currentSymbol = tokenQueue[currentIndex % tokenQueue.length];
       
