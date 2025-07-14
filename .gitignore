@@ -123,3 +123,58 @@ temp/
 # package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
+
+# Aptos Move Contract - Sensitive Files
+#==========================================
+# Aptos configuration and keys
+contract/.aptos/
+contract/**/.aptos/
+*.aptos/
+
+# Private keys and sensitive config
+contract/**/*private_key*
+contract/**/*account*
+contract/**/*.key
+contract/**/*.pem
+
+# Contract build artifacts
+contract/build/
+contract/**/build/
+contract/target/
+
+# Move.toml backups with actual addresses
+contract/Move.toml.bak
+contract/**/Move.toml.bak
+
+# Environment files with contract addresses
+contract/.env
+contract/.env.local
+contract/.env.production
+contract/**/.env
+contract/**/.env.local
+contract/**/.env.production
+!contract/.env.example
+
+# Deployment logs and outputs
+contract/deployment.log
+contract/deploy.log
+contract/**/*.log
+
+# Gas fee reports
+contract/gas-report.txt
+contract/**/gas-report.txt
+
+# Contract interaction history
+contract/history.txt
+contract/**/history.txt
+
+# Temporary files from scripts
+contract/tmp/
+contract/temp/
+contract/**/tmp/
+contract/**/temp/
+
+# Editor temporary files in contract directory
+contract/**/*.swp
+contract/**/*.swo
+contract/**/*~

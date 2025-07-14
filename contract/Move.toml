@@ -1,0 +1,17 @@
+[package]
+name = "TrendPupAccess"
+version = "1.0.0"
+authors = ["TrendPup Team"]
+
+[addresses]
+trendpup_access = "0x19476157bb73de0e8a55568264d111eadfc6503b8c798f0525760e540b18e7cb"
+
+[dev-addresses]
+trendpup_access = "0x42"
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+rev = "mainnet"
+subdir = "aptos-move/framework/aptos-framework"
+
+[dev-dependencies]
