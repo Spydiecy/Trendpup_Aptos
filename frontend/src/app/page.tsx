@@ -6,6 +6,7 @@ import { FaTimes, FaDog, FaChartLine, FaWallet, FaFileAlt, FaComments, FaChartBa
 import ChatInterface from './components/ChatInterface';
 import MemecoinsExplorer from './components/MemecoinsExplorer';
 import AptosWalletConnect from './components/AptosWalletConnect';
+import AccessControl from './components/AccessControl';
 
 // Window position interface
 interface WindowPosition {
@@ -679,15 +680,16 @@ export default function Home() {
       );
   };
 
-      return (
-    <main 
-      ref={containerRef}
-      className="min-h-screen dashboard-bg relative overflow-hidden"
-      onClick={(e) => {
-        e.stopPropagation();
-        activeWindowId && bringToFront(activeWindowId);
-      }}
-    >
+  return (
+    <AccessControl>
+      <main 
+        ref={containerRef}
+        className="min-h-screen dashboard-bg relative overflow-hidden"
+        onClick={(e) => {
+          e.stopPropagation();
+          activeWindowId && bringToFront(activeWindowId);
+        }}
+      >
         {/* Landing page */}
         {!appStarted && renderLandingPage()}
 
@@ -781,5 +783,6 @@ export default function Home() {
 
         {/* Debug info - remove in production */}
       </main>
+    </AccessControl>
   );
 }

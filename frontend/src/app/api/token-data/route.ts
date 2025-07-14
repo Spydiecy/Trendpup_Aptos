@@ -5,7 +5,12 @@ export async function GET() {
   // Use Next.js cache with tags for selective invalidation
   const getCachedTokenData = unstable_cache(
     async () => {
-      const backendUrl = 'http://localhost:3001/api/token-data';
+      // During build time, return empty data to avoid connection errors
+      if (process.env.NODE_ENV === 'production' && !process.env.BACKEND_URL) {
+        return { data: [] };
+      }
+      
+      const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001/api/token-data';
       const response = await fetch(backendUrl);
       if (!response.ok) {
         throw new Error('Failed to fetch token data');

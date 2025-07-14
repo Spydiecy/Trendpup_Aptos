@@ -39,6 +39,11 @@ async function sendToTmux(message: string): Promise<string> {
 
 export async function POST(req: NextRequest) {
   try {
+    // During build time, return a placeholder response
+    if (process.env.NODE_ENV === 'production' && process.env.VERCEL) {
+      return NextResponse.json({ response: 'Agent service not available during build' });
+    }
+    
     const body = await req.json();
     const message = body.message;
     if (!message) {

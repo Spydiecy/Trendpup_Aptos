@@ -120,6 +120,9 @@ export default function AptosWalletConnect() {
     setAccount(null);
     setConnected(false);
     setSelectedWallet('');
+    
+    // Refresh the page to trigger AccessControl to redirect to wallet connection screen
+    window.location.reload();
   };
 
   if (connected && account) {
