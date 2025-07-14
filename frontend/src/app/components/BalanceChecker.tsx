@@ -92,7 +92,7 @@ export default function BalanceChecker() {
 
   return (
     <div className="max-w-2xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">Avalanche Balance Checker</h1>
+      <h1 className="text-3xl font-bold mb-6">Aptos Balance Checker</h1>
       
       <div className="mb-6">
         <div className="flex gap-4">

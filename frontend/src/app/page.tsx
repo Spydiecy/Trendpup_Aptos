@@ -3,12 +3,9 @@
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { FaTimes, FaDog, FaChartLine, FaWallet, FaFileAlt, FaComments, FaChartBar, FaPlug, FaExpand } from 'react-icons/fa';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount, useDisconnect } from 'wagmi';
 import ChatInterface from './components/ChatInterface';
 import MemecoinsExplorer from './components/MemecoinsExplorer';
-import AccessControl from './components/AccessControl';
-import AccessStatus from './components/AccessStatus';
+import AptosWalletConnect from './components/AptosWalletConnect';
 
 // Window position interface
 interface WindowPosition {
@@ -31,9 +28,6 @@ interface OpenWindow {
 }
 
 export default function Home() {
-  const { address, isConnected } = useAccount();
-  const { disconnect } = useDisconnect();
-  const [connected, setConnected] = useState(false);
   const [appStarted, setAppStarted] = useState(false);
   const [chatMode, setChatMode] = useState(false);
   const [openWindows, setOpenWindows] = useState<OpenWindow[]>([]);
@@ -44,11 +38,6 @@ export default function Home() {
   const [dragOffset, setDragOffset] = useState<WindowPosition>({ x: 0, y: 0 });
   const [resizeStart, setResizeStart] = useState<{start: WindowPosition, size: WindowSize} | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  // Update connected state when account changes
-  useEffect(() => {
-    setConnected(isConnected);
-  }, [isConnected]);
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <FaDog /> },
@@ -267,7 +256,6 @@ export default function Home() {
               </button>
             </div>
             <div className="p-6">
-              <AccessStatus />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Dashboard widgets */}
                 <div className="bg-gradient-to-br from-trendpup-beige/50 to-trendpup-beige p-4 rounded-xl shadow-sm">
@@ -502,15 +490,15 @@ export default function Home() {
                 <ul className="list-disc pl-5 mb-4">
                   <li><strong>Network Details:</strong>
                     <ul className="list-disc pl-5 mt-1">
-                      <li>Chain ID: 43113</li>
+                      <li>Network: Aptos Testnet</li>
                       <li>Native Currency: APT</li>
-                      <li>RPC URL: api.APT-test.network/ext/bc/C/rpc</li>
-                      <li>Block Explorer: testnet.snowscan.xyz</li>
+                      <li>RPC URL: https://fullnode.testnet.aptoslabs.com/v1</li>
+                      <li>Block Explorer: https://explorer.aptoslabs.com/?network=testnet</li>
                     </ul>
                   </li>
-                  <li><strong>RainbowKit Wallet Integration:</strong>
+                  <li><strong>Aptos Wallet Integration:</strong>
                     <ul className="list-disc pl-5 mt-1">
-                      <li>MetaMask, WalletConnect, and other popular wallet support</li>
+                      <li>Petra, Pontem, Martian, Rise, and Fewcha wallet support</li>
                       <li>Seamless connection to Aptos testnet</li>
                       <li>Real-time balance and transaction monitoring</li>
                     </ul>
@@ -583,28 +571,12 @@ export default function Home() {
                 className="mx-auto mb-4" 
               />
               <h2 className="text-xl font-bold text-trendpup-dark mb-2">Connect Your Wallet</h2>
-              {isConnected ? (
-                <div className="space-y-4">
-                  <p className="text-gray-600">Connected to Aptos Testnet</p>
-                  <p className="text-gray-600">Address:</p>
-                  <p className="font-mono text-sm bg-gray-100 p-2 rounded break-all">
-                    {address}
-                  </p>
-                  <button 
-                    onClick={() => disconnect()}
-                    className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors"
-                  >
-                    Disconnect
-                  </button>
+              <div className="space-y-4">
+                <p className="text-gray-600 mb-6">Connect your wallet to the Aptos network to track your memecoin investments</p>
+                <div className="flex justify-center">
+                  <AptosWalletConnect />
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <p className="text-gray-600 mb-6">Connect your wallet to the Aptos testnet to track your memecoin investments</p>
-                  <div className="flex justify-center">
-                    <ConnectButton />
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
             {/* Resize handle */}
             <div 
@@ -708,15 +680,14 @@ export default function Home() {
   };
 
       return (
-    <AccessControl>
-      <main 
-        ref={containerRef}
-        className="min-h-screen dashboard-bg relative overflow-hidden"
-        onClick={(e) => {
-          e.stopPropagation();
-          activeWindowId && bringToFront(activeWindowId);
-        }}
-      >
+    <main 
+      ref={containerRef}
+      className="min-h-screen dashboard-bg relative overflow-hidden"
+      onClick={(e) => {
+        e.stopPropagation();
+        activeWindowId && bringToFront(activeWindowId);
+      }}
+    >
         {/* Landing page */}
         {!appStarted && renderLandingPage()}
 
@@ -744,7 +715,7 @@ export default function Home() {
 
               {/* Connect Button */}
               <div className="p-2 rounded-lg shadow-lg bg-white">
-                <ConnectButton />
+                <AptosWalletConnect />
               </div>
             </div>
 
@@ -810,6 +781,5 @@ export default function Home() {
 
         {/* Debug info - remove in production */}
       </main>
-    </AccessControl>
   );
 }

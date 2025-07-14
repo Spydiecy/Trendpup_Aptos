@@ -5,20 +5,12 @@ import 'cross-fetch/polyfill';
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import '@rainbow-me/rainbowkit/styles.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { WagmiProvider } from 'wagmi';
-import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
-import { config } from '../wagmi';
+import { AptosWalletAdapterProvider } from "@aptos-labs/wallet-adapter-react";
+import { wallets, APTOS_NETWORK } from '../aptos';
 import { useState } from 'react';
 
 const inter = Inter({ subsets: ["latin"] });
-
-// Moved metadata to a separate file since this is now a client component
-// export const metadata: Metadata = {
-//   title: "TrendPup - Advanced Memecoin Intelligence",
-//   description: "Early access to emerging meme tokens on Avalanche Fuji testnet before significant price movements",
-// };
 
 export default function RootLayout({
   children,
@@ -30,13 +22,17 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <WagmiProvider config={config}>
-          <QueryClientProvider client={queryClient}>
-            <RainbowKitProvider>
-              {children}
-            </RainbowKitProvider>
-          </QueryClientProvider>
-        </WagmiProvider>
+        <QueryClientProvider client={queryClient}>
+          <AptosWalletAdapterProvider 
+            plugins={wallets} 
+            autoConnect={true}
+            dappConfig={{ 
+              network: APTOS_NETWORK
+            }}
+          >
+            {children}
+          </AptosWalletAdapterProvider>
+        </QueryClientProvider>
       </body>
     </html>
   );
