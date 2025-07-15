@@ -178,3 +178,13 @@ contract/**/temp/
 contract/**/*.swp
 contract/**/*.swo
 contract/**/*~
+
+# Backend
+*.png
+*.html
+backend/aptos_tokens.json
+backend/ai_analyzer.json
+backend/tweets.json
+backend/cookies.json
+*pnpm-lock.yaml
+*poetry.lock
