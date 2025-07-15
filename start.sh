@@ -92,9 +92,12 @@ fi
 
 if ! tmux has-session -t agent 2>/dev/null; then
   tmux new-session -d -s agent "bash -c 'while true; do cd $HOME/trendpup-aptos/agent && source /home/trendpup/.cache/pypoetry/virtualenvs/trendpup-i4fZTrp_-py3.12/bin/activate && adk run rag; echo \"backend crashed. Restarting in 3s...\"; sleep 3; done'"
-  echo "Started tmux session: agent"
+  tmux resize-window -t agent -x 220 -y 40
+  echo "Started tmux session: agent (resized to 220x40)"
 else
   echo "tmux session 'agent' already exists."
+  tmux resize-window -t agent -x 220 -y 40
+  echo "Resized existing tmux session 'agent' to 220x40."
 fi
 
 # List sessions

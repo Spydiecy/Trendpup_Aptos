@@ -10,12 +10,12 @@
 
 ## Key Features
 
-- 🤖 **AI-Powered Analysis** - AWS Bedrock integration for sophisticated token evaluation
+- 🤖 **AI-Powered Analysis** - Google Vertex AI integration for sophisticated token evaluation
 - 🎤 **Voice Interface** - Natural speech input and high-quality voice output
 - 🔗 **Aptos Integration** - Native support for Aptos Move-based smart contracts
 - 📊 **Real-Time Data** - Live token tracking and social sentiment analysis
 - 🛡️ **Scam Detection** - Advanced filtering to identify rugpulls and fake projects
-- 💬 **Eliza AI Agent** - Conversational AI with retrieval-augmented generation
+- 💬 **Custom AI Agent** - Conversational AI with retrieval-augmented generation
 - 💎 **Premium Access** - Smart contract-based 30-day access for 1 APT
 - 🔮 **Move VM Analytics** - Specialized analysis for Aptos Move smart contracts
 - 🔐 **Access Control** - Decentralized payment system via Aptos Move smart contract
@@ -96,7 +96,7 @@ flowchart TB
     end
     
     subgraph "AI Analysis Layer"
-        J[AWS Bedrock Claude]
+        J[Vertex AI]
         K[Risk Assessment Model]
         L[Momentum Detection]
         M[Scam Detection AI]
@@ -201,10 +201,10 @@ flowchart TD
     K -- No --> M
     M --> N[Scraper - Gets Aptos token data from DEXs]
     M --> O[Scraper - Gets tweets and sentiment for tokens]
-    N --> P[AI Analysis using AWS Bedrock + Move VM insights]
+    N --> P[AI Analysis using Vertex AI + Move VM insights]
     O --> P
     P --> Q[Returns risk score, investment potential, and rationale]
-    J --> R[Eliza Agent using AWS Bedrock and RAG]
+    J --> R[Custom Agent using Vertex AI and RAG]
     R --> S[Provides detailed token info using Aptos knowledge base]
     Q --> T{Voice Output Enabled?}
     S --> T
@@ -253,7 +253,7 @@ sequenceDiagram
 ```mermaid
 graph TB
     subgraph "Frontend Layer"
-        A[Next.js 14]
+        A[Next.js]
         B[React Components]
         C[Voice Interface]
         D[Wallet Integration]
@@ -269,12 +269,10 @@ graph TB
         H[Node.js API Server]
         I[Python AI Agent]
         J[Data Scrapers]
-        K[tmux Session Manager]
     end
     
     subgraph "AI & Cloud"
-        L[AWS Bedrock]
-        M[Claude AI Models]
+        M[Vertex AI]
         N[Speech Recognition]
         O[Text-to-Speech]
     end
@@ -290,7 +288,6 @@ graph TB
     C --> N
     D --> G
     
-    H --> L
     I --> M
     J --> P
     J --> Q
@@ -298,8 +295,10 @@ graph TB
     F --> H
     H --> I
     R --> J
+    J --> M
+    J --> I
     
-    style L fill:#ff6b35
+    style M fill:#ff6b35
     style F fill:#0088ff
     style A fill:#32cd32
 ```
@@ -326,12 +325,12 @@ graph TB
   Scrapes Twitter for token-related tweets and sentiment analysis.  
   Monitors Aptos ecosystem for emerging opportunities.
 
-- **AI Analysis (AWS Bedrock):**  
+- **AI Analysis (Vertex AI):**  
   Reads tweets and Aptos token data.  
   Determines risk score, investment potential, and provides rationale.  
   Specialized analysis for Aptos Move smart contracts and ecosystem dynamics.
 
-- **Eliza Agent (AWS Bedrock + RAG):**  
+- **Custom Agent (Vertex AI + RAG):**  
   Advanced AI agent with Retrieval-Augmented Generation.  
   Answers user queries with the latest Aptos token data and in-depth analysis.  
   Supports natural voice interaction and text-to-speech responses.
@@ -401,7 +400,7 @@ graph TB
 
 ```mermaid
 graph LR
-    A[Investment: 1 APT (~$6-8)] --> B[30-Day Access]
+    A[Investment: 1 APT -$6-8] --> B[30-Day Access]
     B --> C[Early Token Detection]
     C --> D[Potential Returns]
     
@@ -420,7 +419,7 @@ graph LR
 ```
 
 **Summary:**  
-This system provides premium memecoin intelligence for Aptos users through a transparent 1 APT payment model. The backend aggregates real-time blockchain and social data from the Aptos ecosystem, then leverages advanced AI (AWS Bedrock) for investment analysis and conversational intelligence, all orchestrated through a modern Next.js frontend with voice-enabled interaction capabilities, specialized Move smart contract analysis, and decentralized access control.
+This system provides premium memecoin intelligence for Aptos users through a transparent 1 APT payment model. The backend aggregates real-time blockchain and social data from the Aptos ecosystem, then leverages advanced AI (Vertex AI) for investment analysis and conversational intelligence, all orchestrated through a modern Next.js frontend with voice-enabled interaction capabilities, specialized Move smart contract analysis, and decentralized access control.
 
 ---
 

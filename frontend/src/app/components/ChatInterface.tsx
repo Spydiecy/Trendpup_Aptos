@@ -221,10 +221,8 @@ export default function ChatInterface({ fullPage = false }: ChatInterfaceProps) 
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const containerHeight = fullPage ? 'h-[calc(100vh-8rem)]' : 'h-[calc(100vh-12rem)]';
-
   return (
-    <div className={`flex flex-col ${containerHeight} max-w-4xl mx-auto rounded-xl shadow-xl overflow-hidden border border-trendpup-brown/20 bg-white`}>
+    <div className={`flex flex-col h-full flex-1 min-h-0 w-full max-w-4xl mx-auto rounded-xl shadow-xl overflow-hidden border border-trendpup-brown/20 bg-white`}>
       {!fullPage && (
         <div className="bg-trendpup-dark text-white p-4 flex items-center justify-between">
           <div className="flex items-center">
@@ -264,14 +262,14 @@ export default function ChatInterface({ fullPage = false }: ChatInterfaceProps) 
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 bg-trendpup-light">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 bg-trendpup-light">
         <div className="space-y-4">
           {messages.map((msg, idx) => (
             <div
               key={idx}
               className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              <div className={`flex items-start max-w-[80%] ${msg.type === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+              <div className={`flex items-start max-w-[80%] ${msg.type === 'user' ? 'flex-row-reverse' : 'flex-row'}`}> 
                 <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${
                   msg.type === 'user' ? 'bg-trendpup-orange ml-2' : 'bg-trendpup-brown mr-2'
                 }`}>
@@ -288,7 +286,7 @@ export default function ChatInterface({ fullPage = false }: ChatInterfaceProps) 
                       : 'bg-white text-trendpup-dark border border-trendpup-brown/20'
                   }`}
                 >
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                  <p className="whitespace-pre-line">{msg.content}</p>
                   <span className="text-xs opacity-75 mt-1 block">
                     {formatTimestamp(msg.timestamp)}
                   </span>

@@ -455,8 +455,8 @@ export default function Home() {
               
               <h2 className="text-xl font-bold text-trendpup-dark mt-6 mb-3">Executive Summary</h2>
               <div className="prose prose-sm">
-                <p className="mb-3">TrendPup is a revolutionary AI-powered platform engineered specifically for the Aptos ecosystem, providing traders with unprecedented early access to emerging meme tokens before significant price movements occur. By leveraging AWS Bedrock for advanced AI analysis and the Eliza Agent for conversational intelligence, TrendPup synthesizes sophisticated social media analytics with on-chain Aptos data to identify high-potential opportunities during their inception phase, allowing users to position themselves advantageously in the market.</p>
-                <p className="mb-3">Our platform democratizes access to valuable pre-pump intelligence previously available only to well-connected insiders and sophisticated traders within the Aptos ecosystem. Powered by AWS Bedrock and Eliza, TrendPup's unique profit-sharing business model aligns our incentives directly with user success, creating a symbiotic relationship where we only succeed when our users profit.</p>
+                <p className="mb-3">TrendPup is a revolutionary AI-powered platform engineered specifically for the Aptos ecosystem, providing traders with unprecedented early access to emerging meme tokens before significant price movements occur. By leveraging Vertex AI for advanced AI analysis and our Custom Agent for conversational intelligence, TrendPup synthesizes sophisticated social media analytics with on-chain Aptos data to identify high-potential opportunities during their inception phase, allowing users to position themselves advantageously in the market.</p>
+                <p className="mb-3">Our platform democratizes access to valuable pre-pump intelligence previously available only to well-connected insiders and sophisticated traders within the Aptos ecosystem. Powered by Vertex AI and our Custom agent, TrendPup's unique profit-sharing business model aligns our incentives directly with user success, creating a symbiotic relationship where we only succeed when our users profit.</p>
               </div>
 
               <h2 className="text-xl font-bold text-trendpup-dark mt-6 mb-3">Technology Infrastructure</h2>
@@ -481,8 +481,8 @@ export default function Home() {
               <div className="prose prose-sm">
                 <ul className="list-disc pl-5 mb-4">
                   <li><strong>Data Aggregation:</strong> Scraper collects Aptos token data from Dex Screener and scrapes Twitter for token-related tweets and sentiment.</li>
-                  <li><strong>AI Analysis (AWS Bedrock):</strong> Reads tweets and token data, determines risk score, investment potential, and provides rationale for each token.</li>
-                  <li><strong>Eliza Agent (AWS Bedrock + RAG):</strong> Answers user queries with the latest token data and in-depth analysis using Retrieval-Augmented Generation.</li>
+                  <li><strong>AI Analysis (Vertex AI):</strong> Reads tweets and token data, determines risk score, investment potential, and provides rationale for each token.</li>
+                  <li><strong>Custom Agent (Vertex AI + RAG):</strong> Answers user queries with the latest token data and in-depth analysis using Retrieval-Augmented Generation.</li>
                 </ul>
               </div>
 

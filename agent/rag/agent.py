@@ -72,8 +72,8 @@ def periodic_upload(corpus_name, files, interval_minutes=10):
     thread = threading.Thread(target=upload_loop, daemon=True)
     thread.start()
 
-# Example usage (enabled):
 files = [
-    {"path": "/home/trendpup/trendpup-aptos/backend/ai_analyzer.json"}
+    {"path": "/home/trendpup/trendpup-aptos/backend/ai_analyzer.json"},
+    {"path": "/home/trendpup/trendpup-aptos/README.md"}
 ]
 periodic_upload(os.environ.get("RAG_CORPUS"), files)
