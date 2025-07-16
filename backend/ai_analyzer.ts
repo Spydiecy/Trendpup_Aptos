@@ -262,11 +262,10 @@ async function main() {
   console.log(`Found ${tokensToAnalyze.length} new tokens to analyze`);
   console.log(`Total tokens in queue: ${tokenQueue.length}`);
   
-  // Process tokens in queue with 5-minute intervals
-  async function processTokenQueue() {
+  // Process tokens in queue with 30-second intervals
+  async function processTokenQueue(tokensToProcess: string[]) {
     let currentIndex = 0;
-    
-    while (true) {
+    while (currentIndex < tokensToProcess.length) {
       // Check if aptos_tokens.json was updated
       if (checkAptosTokensUpdated()) {
         console.log('Detected aptos_tokens.json update. Refreshing market data...');
@@ -279,58 +278,53 @@ async function main() {
           console.error('Error updating market data:', e);
         }
       }
-      
-      // Get current token from queue (cycle through all tokens)
-      const currentSymbol = tokenQueue[currentIndex % tokenQueue.length];
-      
+
+      const currentSymbol = tokensToProcess[currentIndex];
       try {
-        console.log(`Processing token ${currentIndex + 1}/${tokenQueue.length}: ${currentSymbol}`);
-        
+        console.log(`Processing token ${currentIndex + 1}/${tokensToProcess.length}: ${currentSymbol}`);
         const tweets = tweetsObj[currentSymbol]?.tweets || [];
         const tokenInfo = getTokenInfo(currentSymbol, aptosTokens);
-        
         const analysis = await analyzeTokenVertexAI(currentSymbol, tweets, tokenInfo);
-        
         if (analysis && analysis.rationale && analysis.rationale.trim() !== '' && analysis.risk !== -1) {
-          // Check if token already exists in results
           const existingIndex = analysisResults.findIndex(a => a.symbol === currentSymbol);
-          
           if (existingIndex >= 0) {
-            // Update existing analysis
             analysisResults[existingIndex] = analysis;
             console.log(`Updated analysis for ${currentSymbol}`);
           } else {
-            // Add new analysis
             analysisResults.push(analysis);
             console.log(`Added new analysis for ${currentSymbol}`);
           }
-          
-          // Write results after each successful analysis
           writeResultsWithBestToken(analysisResults, OUTPUT_FILE);
         } else if (!analysis) {
           console.warn(`Skipping ${currentSymbol}: Not a memecoin or no valid analysis returned.`);
         }
-        
       } catch (e: any) {
         if (e.message === 'RATE_LIMIT_EXCEEDED') {
           console.log('Daily rate limit exceeded. Stopping analysis until quota resets.');
           console.log('The analyzer will resume automatically when you restart it after quota reset.');
-          break; // Exit the loop
+          break;
         }
         console.error(`Error analyzing token ${currentSymbol}:`, e);
       }
-      
-      // Move to next token
       currentIndex++;
-      
-      // Wait 30 seconds between requests (Vertex AI has much higher limits)
       console.log(`Waiting 30 seconds before next analysis...`);
-      await new Promise(res => setTimeout(res, 30 * 1000)); // 30 seconds
+      await new Promise(res => setTimeout(res, 30 * 1000));
     }
   }
-  
-  // Start processing queue
-  await processTokenQueue();
+
+  // Start initial processing queue for new tokens
+  await processTokenQueue(tokensToAnalyze);
+
+  // Set up daily full re-analysis of all tokens
+  setInterval(async () => {
+    try {
+      console.log('Starting daily full re-analysis of all memecoins...');
+      await processTokenQueue(tokenQueue);
+      console.log('Daily full re-analysis complete.');
+    } catch (e) {
+      console.error('Error during daily full re-analysis:', e);
+    }
+  }, 24 * 60 * 60 * 1000); // 24 hours
 }
 
 main().catch(console.error);

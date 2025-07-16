@@ -1,3 +1,13 @@
+def exit_after_timeout(timeout_seconds=3600):
+    def exit_thread():
+        print(f"Agent will exit after {timeout_seconds/60:.0f} minutes...")
+        time.sleep(timeout_seconds)
+        print("Agent exiting after 1 hour.")
+        os._exit(0)
+    thread = threading.Thread(target=exit_thread, daemon=True)
+    thread.start()
+
+exit_after_timeout(3600)
 import os
 from google.adk.agents import Agent
 from google.adk.tools.retrieval.vertex_ai_rag_retrieval import VertexAiRagRetrieval
